@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#fbf8ff">
+  <meta name="color-scheme" content="light">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Doodle Pad">
+  <meta name="description" content="A simple, colorful, ad-free drawing pad that works offline.">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'none'; worker-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; manifest-src 'self'">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="48x48" href="./icons/favicon.png">
+  <link rel="stylesheet" href="./styles.css">
+  <title>Doodle Pad</title>
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <span class="app-title"><span class="title-mark" aria-hidden="true">✿</span> Doodle Pad</span>
+      <span class="app-tagline">Just draw.</span>
+    </header>
+
+    <main id="drawing-surface" aria-label="Drawing area">
+      <canvas id="art-canvas" aria-hidden="true"></canvas>
+      <canvas id="active-canvas" aria-label="Draw here with a finger or mouse" role="img"></canvas>
+      <div class="empty-hint" id="empty-hint" aria-hidden="true">Draw something!</div>
+    </main>
+
+    <footer class="tool-panel" aria-label="Drawing tools">
+      <div class="tool-section-heading"><span>Brushes</span><span id="brush-name">Pen</span></div>
+      <div id="brush-list" class="brush-list" role="group" aria-label="Choose a brush"></div>
+      <div class="options-row">
+        <div class="color-picker" id="color-list" role="group" aria-label="Choose a color"></div>
+        <label class="size-control" for="brush-size">
+          <span class="size-text">Size</span>
+          <input id="brush-size" type="range" min="4" max="48" step="1" value="18" aria-label="Brush size">
+          <span class="size-preview" id="size-preview" aria-hidden="true"></span>
+        </label>
+      </div>
+      <div class="action-row" role="group" aria-label="Drawing actions">
+        <button id="undo-btn" class="action-button" type="button" disabled aria-label="Undo last stroke"><span aria-hidden="true">↶</span> Undo</button>
+        <button id="redo-btn" class="action-button" type="button" disabled aria-label="Redo last stroke"><span aria-hidden="true">↷</span> Redo</button>
+        <button id="clear-btn" class="action-button danger-button" type="button" disabled aria-label="Clear drawing"><span aria-hidden="true">⌫</span> Clear</button>
+        <button id="save-btn" class="action-button save-button" type="button" aria-label="Save drawing as image"><span aria-hidden="true">↓</span> Save</button>
+      </div>
+    </footer>
+  </div>
+
+  <div class="modal" id="clear-modal" hidden>
+    <div class="modal-card" role="alertdialog" aria-modal="true" aria-labelledby="clear-title" aria-describedby="clear-desc">
+      <h2 id="clear-title">Start a new drawing?</h2>
+      <p id="clear-desc">This clears the canvas. You can undo afterward.</p>
+      <div class="modal-actions">
+        <button type="button" class="modal-button secondary" id="cancel-clear">Keep drawing</button>
+        <button type="button" class="modal-button destructive" id="confirm-clear">Clear canvas</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="save-modal" hidden>
+    <div class="modal-card save-card" role="dialog" aria-modal="true" aria-labelledby="save-title" aria-describedby="save-desc">
+      <h2 id="save-title">Your drawing</h2>
+      <p id="save-desc">On iPhone, use Share to save the picture to Photos, or touch and hold the image.</p>
+      <img id="save-preview" alt="Preview of your drawing">
+      <div class="modal-actions save-actions">
+        <button type="button" class="modal-button secondary" id="close-save">Done</button>
+        <button type="button" class="modal-button secondary" id="download-save">Download PNG</button>
+        <button type="button" class="modal-button primary" id="share-save" hidden>Share image</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
