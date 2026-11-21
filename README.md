@@ -117,4 +117,10 @@ Changing `CACHE_NAME` (`doodle-pad-v2`, `v3`, …) is optional. It makes the bro
 
 ## License
 
-No license is included yet. Keeping it private does not require one. You can choose a license if you make the source public later.
+Doodle Pad is free to use and released under the [MIT License](LICENSE). You may use, copy, modify, share, and sell the app or your own version, including for commercial purposes. Keep the copyright and license notice with copies or substantial portions of the software. The software is provided without warranty.
+
+## Contributing
+
+Propose changes through a pull request. The repository owner, [@octopusduck](https://github.com/octopusduck), decides what is merged into the official app. Forks and pull requests do not change the published app automatically.
+
+The `Tests` workflow runs `npm test` on pushes and pull requests with read-only repository permissions. `main` requires a pull request, passing tests on an up-to-date branch, and resolved review conversations, and blocks force pushes and branch deletion. These requirements also apply to the owner. Only the owner has repository write access; a second maintainer's approval is not required for the owner's own pull requests.
