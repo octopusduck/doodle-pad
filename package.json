@@ -1,6 +1,7 @@
 {
   "name": "doodle-pad",
   "version": "1.0.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "description": "An offline, ad-free drawing PWA",
