@@ -7,8 +7,9 @@ function fakeContext() {
   const ctx = {};
   for (const name of ['save', 'restore', 'beginPath', 'arc', 'moveTo', 'lineTo', 'quadraticCurveTo',
     'bezierCurveTo', 'closePath', 'stroke', 'fill', 'translate', 'rotate', 'clearRect',
-    'setTransform', 'fillRect', 'drawImage']) ctx[name] = () => {};
+    'setTransform', 'fillRect', 'drawImage', 'clip']) ctx[name] = () => {};
   ctx.createRadialGradient = () => ({ addColorStop() {} });
+  ctx.createLinearGradient = () => ({ addColorStop() {} });
   return ctx;
 }
 class FakeElement {
@@ -43,23 +44,29 @@ class FakeElement {
 
 let instance = 0;
 /** Start a fresh copy of the app with a fake DOM, optionally with a saved drawing in localStorage. */
-async function loadApp(saved) {
+async function loadApp(saved, background) {
   const ids = ['drawing-surface','art-canvas','active-canvas','brush-list','color-list','brush-size',
     'clear-modal','save-modal','save-preview','toast','undo-btn','redo-btn','clear-btn',
     'save-btn','brush-name','size-preview','empty-hint','cancel-clear','confirm-clear',
-    'close-save','download-save','share-save'];
+    'close-save','download-save','share-save','tool-panel','brush-tool-icon','color-indicator',
+    'size-value','eraser-btn','canvas-white','canvas-black','theme-color',
+    ...['brush','size','color','eraser','canvas'].flatMap(tool => [`${tool}-toggle`, `${tool}-panel`])];
   const elements = new Map(ids.map(id => [id, new FakeElement()]));
+  for (const tool of ['brush','size','color','eraser','canvas']) elements.get(`${tool}-panel`).hidden = true;
   for (const id of ['clear-modal', 'save-modal', 'toast']) elements.get(id).hidden = true;
   const backing = new Map();
   if (saved !== undefined) backing.set(STORAGE_KEY, typeof saved === 'string' ? saved : JSON.stringify(saved));
+  if (background) backing.set('doodle-pad-canvas-color-v1', background);
   globalThis.localStorage = {
     getItem: key => backing.get(key) ?? null,
     setItem: (key, value) => backing.set(key, value)
   };
+  const documentListeners = {};
   globalThis.document = {
+    documentElement: new FakeElement(),
     getElementById: id => elements.get(id),
     createElement: tag => new FakeElement(tag),
-    addEventListener() {},
+    addEventListener(name, callback) { (documentListeners[name] ||= []).push(callback); },
     activeElement: new FakeElement()
   };
   globalThis.window = { devicePixelRatio: 2, isSecureContext: false, addEventListener() {} };
@@ -71,13 +78,15 @@ async function loadApp(saved) {
   const get = id => elements.get(id);
   const pointer = (type, clientX, clientY) => get('active-canvas').fire(type,
     { pointerId: 1, pointerType: 'touch', clientX, clientY, preventDefault() {} });
-  return { app, get, pointer, read: () => JSON.parse(backing.get(STORAGE_KEY)) };
+  return { app, get, pointer, backing,
+    key: key => documentListeners.keydown.forEach(fn => fn({ key })),
+    read: () => JSON.parse(backing.get(STORAGE_KEY)) };
 }
 
 test('drawing, undo, redo, and undoing a clear works end-to-end without a server', async () => {
   const { get, pointer, read } = await loadApp();
-  assert.equal(get('brush-list').children.length, 8);
-  assert.equal(get('color-list').children.length, 10);
+  assert.equal(get('brush-list').children.length, 7);
+  assert.equal(get('color-list').children.length, 11);
   assert(get('undo-btn').disabled);
   get('brush-list').children.find(c => c.dataset.brush === 'moon').click();
   assert.equal(get('brush-name').textContent, 'Moons');
@@ -107,6 +116,78 @@ test('drawing, undo, redo, and undoing a clear works end-to-end without a server
   assert(get('save-preview').src.startsWith('blob:'), 'an image blob is previewed');
   get('close-save').click();
   assert.equal(get('save-modal').hidden, true);
+});
+
+test('tool options collapse when switching tools, choosing options, drawing, or pressing Escape', async () => {
+  const { get, pointer, key } = await loadApp();
+  get('brush-toggle').click();
+  assert.equal(get('brush-panel').hidden, false);
+  get('size-toggle').click();
+  assert.equal(get('brush-panel').hidden, true);
+  assert.equal(get('size-panel').hidden, false);
+  get('brush-size').value = '32';
+  get('brush-size').fire('input');
+  assert.equal(get('size-value').textContent, '32 px');
+  key('Escape');
+  assert.equal(get('size-panel').hidden, true);
+  get('color-toggle').click();
+  get('color-list').children[0].click();
+  assert.equal(get('color-panel').hidden, true);
+  get('eraser-toggle').click();
+  get('eraser-btn').click();
+  assert.equal(get('eraser-panel').hidden, true);
+  assert.equal(get('eraser-btn').getAttribute('aria-pressed'), 'true');
+  get('canvas-toggle').click();
+  pointer('pointerdown', 50, 50);
+  assert.equal(get('canvas-panel').hidden, true);
+  pointer('pointerup', 50, 50);
+});
+
+test('canvas color survives reload and does not change strokes; erasing is undoable', async () => {
+  const { get, pointer, read, backing } = await loadApp();
+  pointer('pointerdown', 10, 20);
+  pointer('pointerup', 180, 20);
+  const drawing = read();
+  get('canvas-black').click();
+  assert.equal(get('drawing-surface').style.backgroundColor, '#000000');
+  assert.equal(document.documentElement.dataset.theme, 'dark');
+  assert.equal(get('theme-color').getAttribute('content'), '#27292d');
+  assert.deepEqual(read(), drawing);
+  assert.equal(backing.get('doodle-pad-canvas-color-v1'), '#000000');
+  get('eraser-btn').click();
+  pointer('pointerdown', 60, 10);
+  pointer('pointermove', 60, 100);
+  pointer('pointerup', 60, 100);
+  assert.equal(read()[1].brush, 'eraser');
+  assert.equal(get('art-canvas').context.globalCompositeOperation, 'destination-out');
+  get('undo-btn').click();
+  assert.deepEqual(read(), drawing);
+  get('redo-btn').click();
+  assert.equal(read()[1].brush, 'eraser');
+  const reload = await loadApp(read(), backing.get('doodle-pad-canvas-color-v1'));
+  assert.equal(reload.get('drawing-surface').style.backgroundColor, '#000000');
+  assert.equal(document.documentElement.dataset.theme, 'dark');
+  reload.get('canvas-white').click();
+  assert.equal(reload.get('drawing-surface').style.backgroundColor, '#ffffff');
+  assert.equal(document.documentElement.dataset.theme, 'light');
+});
+
+test('rainbow spectrum pattern colors survive backup, undo, redo, and reload', async () => {
+  const { get, pointer, read } = await loadApp();
+  get('brush-list').children.find(c => c.dataset.brush === 'moon').click();
+  get('color-list').children.find(c => c.dataset.color === 'rainbow').click();
+  pointer('pointerdown', 20, 20);
+  pointer('pointermove', 200, 200);
+  pointer('pointerup', 200, 200);
+  const saved = read();
+  assert.equal(saved[0].color, 'rainbow');
+  get('undo-btn').click();
+  assert.equal(read().length, 0);
+  get('redo-btn').click();
+  assert.deepEqual(read(), saved);
+  const reload = await loadApp(saved);
+  assert.equal(reload.get('toast').hidden, true);
+  assert.equal(reload.get('undo-btn').disabled, false);
 });
 
 test('a very long stroke is split so the whole drawing restores after a reload', async () => {

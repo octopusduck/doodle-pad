@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <meta name="theme-color" content="#fbf8ff">
-  <meta name="color-scheme" content="light">
+  <meta id="theme-color" name="theme-color" content="#fbf8ff">
+  <meta name="color-scheme" content="light dark">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Doodle Pad">
@@ -19,7 +19,16 @@
 <body>
   <div id="app">
     <header class="app-header">
-      <span class="app-title"><span class="title-mark" aria-hidden="true">✿</span> Doodle Pad</span>
+      <span class="app-title"><svg class="title-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 20C7 20 3 13 3 5c7 1 12 6 13 15Z" fill="#e9a63f"/>
+        <path d="M16 20C25 20 29 13 29 5c-7 1-12 6-13 15Z" fill="#e9a63f"/>
+        <path d="M16 21C9 15 11 6 16 1c5 5 7 14 0 20Z" fill="#ffd274"/>
+        <path d="M16 20C9 15 4 18 1 23c6 3 12 3 15-3Z" fill="#ffc45e"/>
+        <path d="M16 20c7-5 12-2 15 3-6 3-12 3-15-3Z" fill="#ffc45e"/>
+        <path d="M16 19c-5 3-5 8 0 12 5-4 5-9 0-12Z" fill="#f1b349"/>
+        <path d="m16 21-4-7m4 7v-9m0 9 4-7" fill="none" stroke="#9c6428" stroke-width="1.2" stroke-linecap="round"/>
+        <g fill="#9c6428"><ellipse cx="12" cy="13" rx="1" ry="1.5"/><ellipse cx="16" cy="11" rx="1" ry="1.5"/><ellipse cx="20" cy="13" rx="1" ry="1.5"/></g>
+      </svg> Doodle Pad</span>
       <span class="app-tagline">Just draw.</span>
     </header>
 
@@ -29,22 +38,46 @@
       <div class="empty-hint" id="empty-hint" aria-hidden="true">Draw something!</div>
     </main>
 
-    <footer class="tool-panel" aria-label="Drawing tools">
+    <footer id="tool-panel" class="tool-panel" aria-label="Drawing tools">
+      <section id="brush-panel" class="tool-popover" aria-label="Brush options" hidden>
       <div class="tool-section-heading"><span>Brushes</span><span id="brush-name">Pen</span></div>
       <div id="brush-list" class="brush-list" role="group" aria-label="Choose a brush"></div>
-      <div class="options-row">
-        <div class="color-picker" id="color-list" role="group" aria-label="Choose a color"></div>
+      </section>
+      <section id="size-panel" class="tool-popover" aria-label="Brush size options" hidden>
+        <div class="tool-section-heading">Brush / eraser size <output id="size-value" for="brush-size">18 px</output></div>
         <label class="size-control" for="brush-size">
           <span class="size-text">Size</span>
           <input id="brush-size" type="range" min="4" max="48" step="1" value="18" aria-label="Brush size">
           <span class="size-preview" id="size-preview" aria-hidden="true"></span>
         </label>
-      </div>
-      <div class="action-row" role="group" aria-label="Drawing actions">
-        <button id="undo-btn" class="action-button" type="button" disabled aria-label="Undo last stroke"><span aria-hidden="true">↶</span> Undo</button>
-        <button id="redo-btn" class="action-button" type="button" disabled aria-label="Redo last stroke"><span aria-hidden="true">↷</span> Redo</button>
-        <button id="clear-btn" class="action-button danger-button" type="button" disabled aria-label="Clear drawing"><span aria-hidden="true">⌫</span> Clear</button>
-        <button id="save-btn" class="action-button save-button" type="button" aria-label="Save drawing as image"><span aria-hidden="true">↓</span> Save</button>
+      </section>
+      <section id="color-panel" class="tool-popover" aria-label="Color options" hidden>
+        <div class="tool-section-heading">Drawing color</div>
+        <div class="color-picker" id="color-list" role="group" aria-label="Choose a color"></div>
+      </section>
+      <section id="eraser-panel" class="tool-popover" aria-label="Eraser options" hidden>
+        <div class="tool-section-heading">Eraser</div>
+        <div class="popover-actions">
+          <button id="eraser-btn" class="action-button" type="button" aria-pressed="false">Erase with finger</button>
+          <button id="clear-btn" class="action-button danger-button" type="button" disabled>Erase everything</button>
+        </div>
+      </section>
+      <section id="canvas-panel" class="tool-popover" aria-label="Canvas color options" hidden>
+        <div class="tool-section-heading">Canvas color</div>
+        <div class="popover-actions" role="group" aria-label="Choose canvas color">
+          <button id="canvas-white" class="action-button" type="button" aria-pressed="true"><span class="canvas-swatch white" aria-hidden="true"></span> White</button>
+          <button id="canvas-black" class="action-button" type="button" aria-pressed="false"><span class="canvas-swatch black" aria-hidden="true"></span> Black</button>
+        </div>
+      </section>
+      <div class="toolbar" role="group" aria-label="Drawing tools and actions">
+        <button id="brush-toggle" class="icon-button" type="button" aria-label="Choose brush" title="Brushes" aria-expanded="false" aria-controls="brush-panel"><span id="brush-tool-icon" aria-hidden="true">✏️</span></button>
+        <button id="size-toggle" class="icon-button" type="button" aria-label="Brush size" title="Size" aria-expanded="false" aria-controls="size-panel"><svg viewBox="0 0 28 28" aria-hidden="true"><circle cx="5" cy="14" r="2"/><circle cx="13" cy="14" r="3"/><circle cx="23" cy="14" r="5"/></svg></button>
+        <button id="color-toggle" class="icon-button" type="button" aria-label="Choose drawing color" title="Color" aria-expanded="false" aria-controls="color-panel"><span class="color-indicator" id="color-indicator" aria-hidden="true"></span></button>
+        <button id="eraser-toggle" class="icon-button" type="button" aria-label="Eraser options" title="Eraser" aria-expanded="false" aria-controls="eraser-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14 3 7 7-10 11H6l-4-4L14 3Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="m7 11 7 7M10 21h12" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+        <button id="canvas-toggle" class="icon-button" type="button" aria-label="Choose canvas color" title="Canvas" aria-expanded="false" aria-controls="canvas-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3" fill="white" stroke="currentColor" stroke-width="2"/><path d="M12 4h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6Z" fill="black"/></svg></button>
+        <button id="undo-btn" class="icon-button" type="button" disabled aria-label="Undo last stroke" title="Undo"><span aria-hidden="true">↶</span></button>
+        <button id="redo-btn" class="icon-button" type="button" disabled aria-label="Redo last stroke" title="Redo"><span aria-hidden="true">↷</span></button>
+        <button id="save-btn" class="icon-button save-button" type="button" aria-label="Save drawing as image" title="Save"><span aria-hidden="true">↓</span></button>
       </div>
     </footer>
   </div>

@@ -7,15 +7,15 @@ const ORIGIN = 'https://doodle.test';
 const SOURCE = fs.readFileSync(new URL('../service-worker.js', import.meta.url), 'utf8');
 
 /** Run service-worker.js against an in-memory Cache Storage and a fake network. */
-function loadWorker(network) {
+function loadWorker(network, origin = ORIGIN) {
   const store = new Map();
   const listeners = {};
   const requests = [];
-  const key = request => new URL(typeof request === 'string' ? request : request.url, `${ORIGIN}/`).href.split('?')[0];
+  const key = request => new URL(typeof request === 'string' ? request : request.url, `${origin}/`).href.split('?')[0];
   const cache = { put: async (request, response) => { store.set(key(request), response); } };
   vm.runInNewContext(SOURCE, {
     self: {
-      location: new URL(`${ORIGIN}/`),
+      location: new URL(`${origin}/`),
       addEventListener: (name, listener) => { listeners[name] = listener; },
       skipWaiting: async () => {},
       clients: { claim: async () => {} }
@@ -36,6 +36,25 @@ function loadWorker(network) {
 }
 
 const get = (url, mode = 'cors') => ({ request: { url: `${ORIGIN}${url}`, method: 'GET', mode } });
+
+test('local preview refreshes use the latest files and still fall back offline', async () => {
+  const origin = 'http://localhost:8001';
+  let version = 'cached';
+  let offline = false;
+  const sw = loadWorker(request => {
+    if (offline) throw new TypeError('offline');
+    return new Response(`${version}:${request.url}`);
+  }, origin);
+  await sw.dispatch('install');
+  version = 'edited';
+  const request = new Request(`${origin}/brushes.js`);
+  const fresh = await sw.dispatch('fetch', { request });
+  assert.equal(await fresh.text(), `edited:${request.url}`);
+  assert.equal(sw.requests.at(-1).cache, 'no-store');
+  offline = true;
+  const cached = await sw.dispatch('fetch', { request });
+  assert.equal(await cached.text(), `cached:${request.url}`);
+});
 
 test('install downloads every shell file fresh, bypassing the HTTP cache', async () => {
   const sw = loadWorker(request => new Response(`v1:${request.url}`));

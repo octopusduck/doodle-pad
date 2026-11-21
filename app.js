@@ -1,6 +1,8 @@
 import { BRUSHES, COLORS, renderStroke } from './brushes.js';
 
 const STORAGE_KEY = 'doodle-pad-drawing-v1';
+const CANVAS_COLOR_KEY = 'doodle-pad-canvas-color-v1';
+const TOOL_PANELS = ['brush', 'size', 'color', 'eraser', 'canvas'];
 // These limits are enforced both while drawing/saving and when restoring,
 // so anything that was backed up can always be restored.
 export const MAX_STROKE_POINTS = 20000;
@@ -29,6 +31,8 @@ let currentStroke = null;
 let currentPointerId = null;
 let selectedBrush = 'pen';
 let selectedColor = '#9a57d7';
+let canvasColor = '#ffffff';
+let openTool = null;
 let brushSize = Number(brushSizeInput.value);
 let surfaceWidth = 0;
 let surfaceHeight = 0;
@@ -40,7 +44,7 @@ let lastFocusedElement = null;
 
 function isValidStroke(stroke) {
   return Boolean(stroke && BRUSHES.some(b => b.id === stroke.brush) &&
-    /^#[\da-fA-F]{6}$/.test(stroke.color) &&
+    (/^#[\da-fA-F]{6}$/.test(stroke.color) || stroke.color === 'rainbow') &&
     Number.isFinite(stroke.size) && stroke.size >= 2 && stroke.size <= 100 &&
     Number.isInteger(stroke.seed) && stroke.seed >= 0 && stroke.seed <= 4294967295 &&
     Array.isArray(stroke.points) && stroke.points.length > 0 && stroke.points.length <= MAX_STROKE_POINTS &&
@@ -128,7 +132,11 @@ function redrawArtwork() {
 function redrawActive() {
   if (!surfaceWidth || !surfaceHeight) return;
   activeCtx.clearRect(0, 0, surfaceWidth, surfaceHeight);
-  if (currentStroke) renderStroke(activeCtx, currentStroke, surfaceWidth, surfaceHeight);
+  if (currentStroke?.brush === 'eraser') {
+    // Erase the artwork layer while dragging so the canvas background shows through.
+    redrawArtwork();
+    renderStroke(artCtx, currentStroke, surfaceWidth, surfaceHeight);
+  } else if (currentStroke) renderStroke(activeCtx, currentStroke, surfaceWidth, surfaceHeight);
 }
 
 function queueActiveRedraw() {
@@ -153,6 +161,10 @@ function selectBrush(brush) {
   for (const button of brushList.querySelectorAll('button')) {
     button.setAttribute('aria-pressed', String(button.dataset.brush === selectedBrush));
   }
+  $('eraser-btn').setAttribute('aria-pressed', String(brush === 'eraser'));
+  $('eraser-toggle').dataset.active = String(brush === 'eraser');
+  $('brush-toggle').dataset.active = String(brush !== 'eraser');
+  if (brush !== 'eraser') $('brush-tool-icon').textContent = BRUSHES.find(b => b.id === brush)?.icon;
   updateSizePreview();
 }
 
@@ -168,11 +180,54 @@ function selectColor(color) {
 function updateSizePreview() {
   const preview = $('size-preview');
   preview.style.setProperty('--dot-size', `${Math.max(5, Math.min(20, brushSize * .58))}px`);
-  preview.style.setProperty('--dot-color', selectedBrush === 'eraser' ? '#aaaaaa' : selectedColor);
+  const colorPreview = selectedColor === 'rainbow' ? 'conic-gradient(#ed4264, #f3cc24, #2bbb70, #357af2, #9a57d7, #ed4264)' : selectedColor;
+  preview.style.setProperty('--dot-color', selectedBrush === 'eraser' ? '#aaaaaa' : colorPreview);
+  $('size-value').textContent = `${brushSize} px`;
+  $('color-indicator').style.setProperty('--selected-color', colorPreview);
+}
+
+function closeToolPanel(restoreFocus = false) {
+  const previous = openTool;
+  for (const tool of TOOL_PANELS) {
+    $(`${tool}-panel`).hidden = true;
+    $(`${tool}-toggle`).setAttribute('aria-expanded', 'false');
+  }
+  openTool = null;
+  if (restoreFocus && previous) $(`${previous}-toggle`).focus();
+}
+
+function selectCanvasColor(color, persist = true) {
+  canvasColor = color;
+  document.documentElement.dataset.theme = color === '#000000' ? 'dark' : 'light';
+  $('theme-color').setAttribute('content', color === '#000000' ? '#27292d' : '#fbf8ff');
+  drawingSurface.style.backgroundColor = color;
+  $('canvas-white').setAttribute('aria-pressed', String(color === '#ffffff'));
+  $('canvas-black').setAttribute('aria-pressed', String(color === '#000000'));
+  if (persist) {
+    try { localStorage.setItem(CANVAS_COLOR_KEY, color); }
+    catch (_) { showToast('Could not save your canvas color on this device.'); }
+  }
 }
 
 function setupControls() {
-  for (const brush of BRUSHES) {
+  for (const tool of TOOL_PANELS) {
+    $(`${tool}-toggle`).addEventListener('click', () => {
+      const wasOpen = openTool === tool;
+      closeToolPanel();
+      if (!wasOpen) {
+        openTool = tool;
+        $(`${tool}-panel`).hidden = false;
+        $(`${tool}-toggle`).setAttribute('aria-expanded', 'true');
+      }
+    });
+  }
+  document.addEventListener('pointerdown', event => {
+    if (openTool && !$('tool-panel').contains(event.target)) closeToolPanel();
+  });
+  document.addEventListener('focusin', event => {
+    if (openTool && !$('tool-panel').contains(event.target)) closeToolPanel();
+  });
+  for (const brush of BRUSHES.filter(brush => brush.id !== 'eraser')) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'brush-button';
@@ -187,7 +242,7 @@ function setupControls() {
     label.className = 'brush-label';
     label.textContent = brush.label;
     button.append(icon, label);
-    button.addEventListener('click', () => selectBrush(brush.id));
+    button.addEventListener('click', () => { selectBrush(brush.id); closeToolPanel(true); });
     brushList.append(button);
   }
   for (const color of COLORS) {
@@ -198,12 +253,19 @@ function setupControls() {
     button.dataset.light = String(color.value === '#ffffff' || color.value === '#f3cc24');
     button.setAttribute('aria-label', color.name);
     button.setAttribute('aria-pressed', 'false');
-    button.style.setProperty('--swatch', color.value);
-    button.addEventListener('click', () => selectColor(color.value));
+    button.style.setProperty('--swatch', color.value === 'rainbow' ? 'conic-gradient(#ed4264, #f3cc24, #2bbb70, #357af2, #9a57d7, #ed4264)' : color.value);
+    button.addEventListener('click', () => { selectColor(color.value); closeToolPanel(true); });
     colorList.append(button);
   }
   selectBrush(selectedBrush);
   selectColor(selectedColor);
+  let savedColor;
+  try { savedColor = localStorage.getItem(CANVAS_COLOR_KEY); } catch (_) { /* storage unavailable */ }
+  selectCanvasColor(savedColor === '#000000' ? '#000000' : '#ffffff', false);
+  for (const [name, color] of [['white', '#ffffff'], ['black', '#000000']]) {
+    $(`canvas-${name}`).addEventListener('click', () => { selectCanvasColor(color); closeToolPanel(true); });
+  }
+  $('eraser-btn').addEventListener('click', () => { selectBrush('eraser'); closeToolPanel(true); });
   brushSizeInput.addEventListener('input', () => {
     brushSize = Number(brushSizeInput.value);
     updateSizePreview();
@@ -231,6 +293,7 @@ function setupControls() {
     if (event.key === 'Escape') {
       if (!saveModal.hidden) closeSaveDialog();
       else if (!clearModal.hidden) closeModal(clearModal);
+      else closeToolPanel(true);
     }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z' && saveModal.hidden && clearModal.hidden) {
       event.preventDefault();
@@ -282,6 +345,7 @@ function commitStroke(stroke) {
 function beginDrawing(event) {
   if (currentStroke || (event.pointerType === 'mouse' && event.button !== 0) || !clearModal.hidden || !saveModal.hidden) return;
   event.preventDefault();
+  closeToolPanel();
   currentPointerId = event.pointerId;
   currentStroke = newStroke(pointFromEvent(event), { brush: selectedBrush, color: selectedColor, size: brushSize });
   try { activeCanvas.setPointerCapture(event.pointerId); } catch (_) { /* unsupported */ }
@@ -329,6 +393,7 @@ function redo() {
 }
 
 function openModal(modal, focusTarget) {
+  closeToolPanel(true);
   lastFocusedElement = document.activeElement;
   modal.hidden = false;
   focusTarget?.focus();
@@ -339,12 +404,12 @@ function closeModal(modal) {
 }
 
 function makePngBlob() {
-  // Export exactly what is visible, with an opaque white background.
+  // Export exactly what is visible, with the selected opaque canvas background.
   const canvas = document.createElement('canvas');
   canvas.width = artCanvas.width;
   canvas.height = artCanvas.height;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = canvasColor;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(artCanvas, 0, 0);
   ctx.drawImage(activeCanvas, 0, 0);

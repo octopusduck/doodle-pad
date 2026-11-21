@@ -5,15 +5,19 @@ A small drawing app for iPhone, Android, and desktop browsers. **No ads, analyti
 ## Brushes
 
 - **Pen:** Solid-color freehand line
-- **Moons:** A trail of crescent moons
-- **Clovers:** A trail of four-leaf clovers
+- **Moons:** Spaced crescent moons with a fixed tilt, crater details, and a soft glow
+- **Clovers:** Spaced four-leaf clovers with heart-shaped leaves, veins, stems, and a soft glow
 - **Glow dots:** Dots with a soft halo
-- **Sparkles:** Scattered, color-changing stars
+- **Sparkles:** Scattered stars in the selected color or rainbow mix
 - **Rainbow:** A continuous line that changes hue along the path
 - **Color mix:** A line that switches between bright colors
-- **Eraser:** Paints white over the drawing
+- **Eraser:** Removes marks along your finger or mouse path, revealing the canvas color
 
-You can choose a color and a brush size. The bottom toolbar also provides **Undo**, **Redo**, **Clear** (with confirmation), and **Save**.
+The compact bottom toolbar has icons for **Brushes**, **Size**, **Color**, **Eraser**, **Canvas color**, **Undo**, **Redo**, and **Save**. Tap an icon to open its options above the toolbar without resizing the drawing. Only one options panel opens at a time; choose a brush or color, tap the icon again, start drawing, tap outside the toolbar, or press Escape to collapse it. Size stays open while adjusting the slider.
+
+Under **Eraser**, choose **Erase with finger** for normal erasing, or **Erase everything** to clear the drawing with confirmation. Both can be undone. Use **Size** to change brush or eraser thickness. **Canvas color** offers white and black, preserves your drawing, and is remembered on this device. Saved PNGs include the selected background.
+
+The black canvas also changes the surrounding controls and dialogs to dark gray. In **Color**, the **Rainbow spectrum** swatch cycles through hues along the path for moons, clovers, glow dots, and sparkles, using the same color progression as the Rainbow pen. Each stroke keeps the same colors through redraws, undo/redo, saving, and reload. The regular pen also supports this spectrum option; the Color mix brush retains its random palette.
 
 ## Files
 
@@ -29,6 +33,8 @@ You can choose a color and a brush size. The bottom toolbar also provides **Undo
 | `tests/` | Automated source and brush-rendering tests |
 
 No build step is required. You can edit these files directly in VS Code.
+
+Local previews on `localhost` or `127.0.0.1` load current files on refresh while the preview server is running. After updating from an older app version, allow the service worker update to finish and refresh once more to pick up this behavior. Hosted installations continue to update on the next launch.
 
 ## 1. Test on Windows in VS Code
 
@@ -69,8 +75,10 @@ To install it as a standalone offline Home Screen app, the files must be availab
 
 1. Upload the *contents* of the project folder to an HTTPS static host. No server code or build command is needed.
 2. Open the HTTPS address in **Safari** on the iPhone.
-3. Tap **Share > Add to Home Screen > Add** (iOS wording may vary).
+3. Tap **Share > Add to Home Screen**, enable **Open as Web App** if shown, then tap **Add** (iOS wording may vary).
 4. Open **Doodle Pad** from the Home Screen once while connected, wait for the first load to finish, then test it in **Airplane Mode**.
+
+The app's manifest uses standalone display mode, so launching the installed Home Screen app hides the browser address bar. Opening a normal browser tab still shows browser controls; the page cannot automatically hide them on launch.
 
 Service workers cache all app files when first opened from HTTPS. After installation, the app runs locally even without an internet connection. Each time the app opens while online, it quietly checks your host for a newer version of its own files (see [Update the app](#update-the-app)); it makes no analytics or API requests. The hosting provider may record ordinary download/access logs.
 
@@ -103,7 +111,6 @@ Changing `CACHE_NAME` (`doodle-pad-v2`, `v3`, …) is optional. It makes the bro
 - Drawings can shift or stretch slightly when changing from portrait to landscape, because positions are stored relative to canvas dimensions. Keep the orientation consistent for a single drawing.
 - An extremely long single stroke (20,000+ points) is stored as two strokes, so it takes two Undos to remove.
 - The local backup has a size limit. If a drawing grows past it, the app says so, keeps the last backup it could make, and you should save a PNG.
-- The eraser paints white. It's designed for the app's white canvas, not transparency.
 - A PNG is a flattened picture, not an editable stroke file.
 - The app doesn't automatically copy pictures into Apple Photos; saving uses the browser/iOS Share sheet.
 - The source is written to be testable in browsers, but still needs device testing on your iPhone.

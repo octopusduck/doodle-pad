@@ -21,10 +21,11 @@ export const COLORS = [
   { name: 'Blue', value: '#357af2' },
   { name: 'Purple', value: '#9a57d7' },
   { name: 'Pink', value: '#f066b8' },
-  { name: 'White', value: '#ffffff' }
+  { name: 'White', value: '#ffffff' },
+  { name: 'Rainbow spectrum', value: 'rainbow' }
 ];
 
-const COLOR_MIX = COLORS.slice(1, -1).map(c => c.value);
+const COLOR_MIX = COLORS.filter(c => !['#29213d', '#ffffff', 'rainbow'].includes(c.value)).map(c => c.value);
 const TAU = Math.PI * 2;
 
 function pseudoRandom(seed) {
@@ -103,11 +104,29 @@ function colorChangingLine(ctx, points, size, seed, isRainbow) {
   }
 }
 
-function drawMoon(ctx, x, y, size, color, angle) {
+function drawHalo(ctx, x, y, size, color) {
+  const radius = size * 1.05;
+  const glow = ctx.createRadialGradient(x, y, size * .15, x, y, radius);
+  glow.addColorStop(0, color);
+  glow.addColorStop(.3, color);
+  glow.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.save();
+  ctx.globalAlpha = .18;
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, TAU);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawMoon(ctx, x, y, size, color) {
   const r = size * .58;
+  drawHalo(ctx, x, y, size, color);
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(angle - .4);
+  // Keep the emoji-like tilt fixed, regardless of the direction of the stroke.
+  ctx.rotate(.65);
+  ctx.translate(-r * .5, 0);
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(0, -r);
@@ -115,27 +134,67 @@ function drawMoon(ctx, x, y, size, color, angle) {
   ctx.bezierCurveTo(r * .65, r * .36, r * .65, -r * .36, 0, -r);
   ctx.closePath();
   ctx.fill();
+  ctx.clip();
+  // Translucent crater shadows and rims preserve the selected base color.
+  for (const [cx, cy, radius] of [[.82, -.34, .15], [.96, .13, .1], [.59, .62, .11]]) {
+    ctx.fillStyle = 'rgba(0,0,0,.2)';
+    ctx.beginPath();
+    ctx.arc(cx * r, cy * r, radius * r, 0, TAU);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,.3)';
+    ctx.lineWidth = Math.max(.5, size * .018);
+    ctx.beginPath();
+    ctx.arc(cx * r, cy * r, radius * r, .1 * Math.PI, .85 * Math.PI);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
-function drawClover(ctx, x, y, size, color, angle) {
-  const r = size * .33;
+function drawClover(ctx, x, y, size, color) {
+  drawHalo(ctx, x, y, size, color);
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(angle);
-  ctx.fillStyle = color;
-  for (const [dx, dy] of [[-r * .83, -r * .83], [r * .83, -r * .83], [-r * .83, r * .83], [r * .83, r * .83]]) {
-    ctx.beginPath();
-    ctx.arc(dx, dy, r, 0, TAU);
-    ctx.fill();
-  }
+  // Paint the stem first so the leaflets cover its upper section.
   ctx.strokeStyle = color;
   ctx.lineWidth = Math.max(1.1, size * .095);
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(0, size * .09);
-  ctx.quadraticCurveTo(size * .13, size * .55, size * .43, size * .67);
+  ctx.quadraticCurveTo(size * .08, size * .57, size * .35, size * .78);
   ctx.stroke();
+  // Four heart-shaped leaflets, with a notch and a fine vein in each leaf.
+  for (let leaf = 0; leaf < 4; leaf++) {
+    ctx.save();
+    ctx.rotate(Math.PI / 4 + leaf * Math.PI / 2);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.bezierCurveTo(-size * .18, -size * .12, -size * .48, -size * .44, -size * .27, -size * .61);
+    ctx.bezierCurveTo(-size * .14, -size * .72, 0, -size * .61, 0, -size * .53);
+    ctx.bezierCurveTo(0, -size * .61, size * .14, -size * .72, size * .27, -size * .61);
+    ctx.bezierCurveTo(size * .48, -size * .44, size * .18, -size * .12, 0, 0);
+    ctx.closePath();
+    ctx.fill();
+    // Light on the rounded lobes, shade at the fold: keep the selected hue underneath.
+    const leafShading = ctx.createLinearGradient(-size * .2, -size * .65, size * .12, 0);
+    leafShading.addColorStop(0, 'rgba(255,255,255,.46)');
+    leafShading.addColorStop(.35, 'rgba(255,255,255,.16)');
+    leafShading.addColorStop(.6, 'rgba(0,0,0,0)');
+    leafShading.addColorStop(1, 'rgba(0,0,0,.4)');
+    ctx.fillStyle = leafShading;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.16)';
+    ctx.lineWidth = Math.max(.4, size * .015);
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.22)';
+    ctx.lineWidth = Math.max(.6, size * .025);
+    ctx.beginPath();
+    ctx.moveTo(0, -size * .07);
+    ctx.quadraticCurveTo(size * .02, -size * .25, 0, -size * .49);
+    ctx.stroke();
+    ctx.restore();
+  }
   ctx.restore();
 }
 
@@ -177,9 +236,7 @@ function starPath(ctx, x, y, radius, tips = 4) {
   ctx.closePath();
 }
 
-function drawSparkle(ctx, x, y, size, seed, index) {
-  const colors = ['#ffca39', '#f36fc3', '#63bef9', '#9a74f7', '#32cfa3'];
-  const color = colors[Math.floor(pseudoRandom(seed + index * 7) * colors.length)];
+function drawSparkle(ctx, x, y, size, seed, index, color) {
   const radius = size * (.36 + pseudoRandom(seed + index * 11) * .32);
   const xj = (pseudoRandom(seed + index * 17) - .5) * size * .75;
   const yj = (pseudoRandom(seed + index * 19) - .5) * size * .75;
@@ -198,16 +255,19 @@ function drawSparkle(ctx, x, y, size, seed, index) {
 
 function stampsAlongPath(ctx, stroke, points) {
   const { brush, size, color, seed } = stroke;
-  const spacing = Math.max(5, size * (brush === 'sparkle' ? .95 : brush === 'glow' ? 1.45 : 1.15));
+  const spacing = Math.max(5, size * (brush === 'sparkle' ? .95 : brush === 'glow' ? 1.45 : 1.85));
   let index = 0;
-  function stamp(x, y, angle) {
-    if (brush === 'moon') drawMoon(ctx, x, y, size, color, angle);
-    else if (brush === 'clover') drawClover(ctx, x, y, size, color, angle);
-    else if (brush === 'glow') drawGlow(ctx, x, y, size, color);
-    else if (brush === 'sparkle') drawSparkle(ctx, x, y, size, seed, index);
+  function stamp(x, y) {
+    // Use the same distance-based hue cycle as the Rainbow pen.
+    const stampColor = color === 'rainbow'
+      ? `hsl(${(index * spacing * 1.25) % 360} 100% 50%)` : color;
+    if (brush === 'moon') drawMoon(ctx, x, y, size, stampColor);
+    else if (brush === 'clover') drawClover(ctx, x, y, size, stampColor);
+    else if (brush === 'glow') drawGlow(ctx, x, y, size, stampColor);
+    else if (brush === 'sparkle') drawSparkle(ctx, x, y, size, seed, index, stampColor);
     index++;
   }
-  stamp(points[0].x, points[0].y, 0);
+  stamp(points[0].x, points[0].y);
   let untilNext = spacing;
   for (let i = 1; i < points.length; i++) {
     const a = points[i - 1];
@@ -216,12 +276,11 @@ function stampsAlongPath(ctx, stroke, points) {
     const dy = b.y - a.y;
     const dist = Math.hypot(dx, dy);
     if (dist < .001) continue;
-    const angle = Math.atan2(dy, dx);
     let traveled = 0;
     while (dist - traveled >= untilNext - .00001) {
       traveled += untilNext;
       const fraction = Math.min(1, traveled / dist);
-      stamp(a.x + dx * fraction, a.y + dy * fraction, angle);
+      stamp(a.x + dx * fraction, a.y + dy * fraction);
       untilNext = spacing;
     }
     untilNext -= dist - traveled;
@@ -234,7 +293,9 @@ export function renderStroke(ctx, stroke, width, height) {
   const points = stroke.points.map(point => pointAt(point, width, height));
   ctx.save();
   if (stroke.brush === 'pen' || stroke.brush === 'eraser') {
-    solidLine(ctx, points, stroke.size, stroke.brush === 'eraser' ? '#ffffff' : stroke.color);
+    if (stroke.brush === 'eraser') ctx.globalCompositeOperation = 'destination-out';
+    if (stroke.brush === 'pen' && stroke.color === 'rainbow') colorChangingLine(ctx, points, stroke.size, stroke.seed, true);
+    else solidLine(ctx, points, stroke.size, stroke.color === 'rainbow' ? '#000000' : stroke.color);
   } else if (stroke.brush === 'rainbow' || stroke.brush === 'multicolor') {
     colorChangingLine(ctx, points, stroke.size, stroke.seed, stroke.brush === 'rainbow');
   } else {

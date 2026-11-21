@@ -1,5 +1,5 @@
 /* Offline-first app shell. No analytics, push notifications, background sync, or remote APIs. */
-const CACHE_NAME = 'doodle-pad-v2';
+const CACHE_NAME = 'doodle-pad-v3';
 const SHELL_FILES = [
   './',
   './index.html',
@@ -48,6 +48,11 @@ self.addEventListener('message', event => {
 });
 
 async function respond(event) {
+  // Local previews should show edits on refresh; retain the offline fallback.
+  if (['localhost', '127.0.0.1', '[::1]'].includes(self.location.hostname)) {
+    try { return await fetch(new Request(event.request, { cache: 'no-store' })); }
+    catch (_) { /* Use the offline shell when the preview server is unavailable. */ }
+  }
   const cached = await caches.match(event.request, { ignoreSearch: true });
   if (cached) return cached;
   try {
