@@ -283,6 +283,7 @@ function setupControls() {
       persistDrawing();
       redrawArtwork();
     }
+    selectBrush('pen');
     closeModal(clearModal);
   });
   $('save-btn').addEventListener('click', openSaveDialog);
